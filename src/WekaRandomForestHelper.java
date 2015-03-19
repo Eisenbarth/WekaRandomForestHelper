@@ -29,15 +29,17 @@ public class WekaRandomForestHelper {
         final JCommander jc = new JCommander(parameters);
         jc.addCommand("classify", parameters.commandClassify);
         jc.addCommand("build", parameters.commandBuild);
-        parseCmdLineArgs(jc);
+        parseCmdLineArgs(jc, args);
 
         if (jc.getParsedCommand().equalsIgnoreCase("build")) {
             String arffFilename = parameters.commandBuild.getArffFilename();
-            WekaRandomForestHelper.runBuilder(arffFilename);
+            String classifierModel = parameters.commandBuild.getClassifierModel();
+            WekaRandomForestHelper.runBuilder(arffFilename, classifierModel);
         } else if (jc.getParsedCommand().equalsIgnoreCase("classify")) {
             String classifierModel = parameters.commandClassify.getClassifierModel();
             List<String> arffFilenames = parameters.commandClassify.getArffFilenames();
-            WekaRandomForestHelper.runClassifier(classifierModel, arffFilenames);
+            List<String> LabeledArffFilenames = parameters.commandClassify.getLabeledArffFilenames();
+            WekaRandomForestHelper.runClassifier(classifierModel, arffFilenames, LabeledArffFilenames);
         }
     }
 
@@ -56,7 +58,7 @@ public class WekaRandomForestHelper {
         }
     }
 
-    private static void runBuilder(String arffFilename) {
+    private static void runBuilder(String arffFilename, String classifierModelFilename) {
         String trainDataFilepath = arffFilename;
 
         File file = new File(trainDataFilepath);
@@ -80,7 +82,7 @@ public class WekaRandomForestHelper {
             printEvaluation(classifier, data);
 
             // serialize classifier
-            SerializationHelper.write("classifier.model", classifier);
+            SerializationHelper.write(getClassifierModelFileName(classifierModelFilename), classifier);
 
         } catch (FileNotFoundException e1) {
             e1.printStackTrace();
@@ -89,12 +91,21 @@ public class WekaRandomForestHelper {
         }
     }
 
-    private static void runClassifier(String classifierModelFilename, List<String> arffFilenames) {
+    private static String getClassifierModelFileName(String classifierModelFilename) {
+        System.out.println(classifierModelFilename);
+        if(classifierModelFilename == null)
+            return "resources/classifier.model";
+        else
+            return classifierModelFilename;
+    }
+
+    private static void runClassifier(String classifierModelFilename, List<String> arffFilenames, List<String> labeledArffFilenames) {
         try {
             Classifier classifier = (Classifier) weka.core.SerializationHelper.read(classifierModelFilename);
 
             System.out.println("The classifier is running.");
-            for (String arffFilename : arffFilenames) {
+            for (int i = 0 ; i < arffFilenames.size() ; i++) {
+                String arffFilename = arffFilenames.get(i);
                 // load unlabeled data
                 Instances unlabeled = new Instances(new BufferedReader(new FileReader(arffFilename)));
 
@@ -105,18 +116,26 @@ public class WekaRandomForestHelper {
                 Instances labeled = new Instances(unlabeled);
 
                 // label instances
-                for (int i = 0; i < unlabeled.numInstances(); i++) {
-                    double clsLabel = classifier.classifyInstance(unlabeled.instance(i));
-                    labeled.instance(i).setClassValue(clsLabel);
+                for (int j = 0; j < unlabeled.numInstances(); j++) {
+                    double clsLabel = classifier.classifyInstance(unlabeled.instance(j));
+                    labeled.instance(j).setClassValue(clsLabel);
+                }
+                
+                String outputFile = null;
+                if(labeledArffFilenames == null || labeledArffFilenames.get(i) == null) {
+                    String[] tokens = arffFilename.split("\\.");
+                    // for(String s : tokens){
+                    // System.out.println(s);
+                    // }
+                    tokens[0] = tokens[0] + "Labeled";
+                    outputFile = Utils.join(tokens, ".");
+                } else {
+                    outputFile = labeledArffFilenames.get(i);
                 }
                 // save labeled data
                 // System.out.println(arffFilename);
-                String[] tokens = arffFilename.split("\\.");
-                // for(String s : tokens){
-                // System.out.println(s);
-                // }
-                tokens[0] = tokens[0] + "Labeled";
-                BufferedWriter writer = new BufferedWriter(new FileWriter(Utils.join(tokens, ".")));
+                
+                BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile));
                 writer.write(labeled.toString());
                 writer.newLine();
 
