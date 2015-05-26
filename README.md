@@ -7,7 +7,7 @@ WekaRandomForestHelper is a java application that help you to build random fores
 
 WekaRandomForestHelper uses the jar of Weka which can be found [here](http://www.cs.waikato.ac.nz/ml/weka/downloading.html) (The zip archive in the « other platform » section).
 
-It also uses the jar of Jcommander which can be found in the download section of that repository.
+It also uses the jar of Jcommander which can be build from the sources found [here](https://github.com/cbeust/jcommander)
 
 # Usage
 
